@@ -1,0 +1,7 @@
+Backup reason: known-working version of csv_waveform_editor.py before adding
+interpolation (Linear/Cubic/B-Spline/Akima/Lanczos), undo history with
+zoom-to-changed-range, and the bottom overview/minimap panel with viewport
+indicator.
+Created: 2026-07-16 18:19:05
+Files:
+- csv_waveform_editor.py

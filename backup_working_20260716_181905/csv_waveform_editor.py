@@ -115,73 +115,6 @@ def write_csv_curves(path, x_values, curves, x_header, include_header=True):
             writer.writerow(row)
 
 
-# Interpolation methods offered in the "Interpolate..." dialog.
-INTERPOLATION_METHODS = ["Linear", "Cubic", "B-Spline", "Akima", "Lanczos"]
-
-
-def _lanczos_kernel(x, a=3):
-    x = np.asarray(x, dtype=float)
-    out = np.sinc(x) * np.sinc(x / a)
-    out[np.abs(x) > a] = 0.0
-    return out
-
-
-def _lanczos_resample(old_x, old_y, new_x, a=3):
-    """Windowed-sinc (Lanczos) resampling, assuming roughly uniform spacing in old_x."""
-    old_x = np.asarray(old_x, dtype=float)
-    old_y = np.asarray(old_y, dtype=float)
-    n = len(old_x)
-    if n < 2:
-        return np.full(len(new_x), old_y[0] if n == 1 else 0.0)
-
-    dx = (old_x[-1] - old_x[0]) / (n - 1)
-    if dx == 0:
-        return np.full(len(new_x), old_y[0])
-
-    new_y = np.empty(len(new_x), dtype=float)
-    for i, xt in enumerate(new_x):
-        pos = (xt - old_x[0]) / dx
-        base = int(np.floor(pos))
-        idxs = np.arange(base - a + 1, base + a + 1)
-        weights = _lanczos_kernel(pos - idxs, a)
-        clipped = np.clip(idxs, 0, n - 1)
-        wsum = weights.sum()
-        if wsum == 0:
-            new_y[i] = old_y[clipped[np.argmin(np.abs(idxs - pos))]]
-        else:
-            new_y[i] = np.sum(weights * old_y[clipped]) / wsum
-    return new_y
-
-
-def interpolate_values(old_x, old_y, new_x, method):
-    """Resample old_y (sampled at old_x) onto new_x using the given method.
-
-    method is one of the labels in INTERPOLATION_METHODS.
-    """
-    old_x = np.asarray(old_x, dtype=float)
-    old_y = np.asarray(old_y, dtype=float)
-    new_x = np.asarray(new_x, dtype=float)
-
-    if method == "Linear":
-        return np.interp(new_x, old_x, old_y)
-    if method == "Cubic":
-        from scipy.interpolate import CubicSpline
-
-        return CubicSpline(old_x, old_y)(new_x)
-    if method == "B-Spline":
-        from scipy.interpolate import make_interp_spline
-
-        k = min(3, len(old_x) - 1)
-        return make_interp_spline(old_x, old_y, k=k)(new_x)
-    if method == "Akima":
-        from scipy.interpolate import Akima1DInterpolator
-
-        return Akima1DInterpolator(old_x, old_y)(new_x)
-    if method == "Lanczos":
-        return _lanczos_resample(old_x, old_y, new_x)
-    raise ValueError(f"Unknown interpolation method: {method}")
-
-
 class CsvWaveformEditorApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -215,17 +148,6 @@ class CsvWaveformEditorApp(tk.Tk):
         self._right_pan_start_xlim = None
         self._right_pan_start_ylim = None
 
-        # Undo history: list of {"snapshot", "changed_x_range", "description"}.
-        self.undo_stack = []
-        self._undo_stack_limit = 50
-        self._pending_pre_snapshot = None
-        self._pending_changed_range = None
-
-        # Bottom overview ("minimap") panel state.
-        self.overview_lines = {}
-        self._overview_indicator = None
-        self._xlim_cid = None
-
         # Whether to write a header row when saving; defaults to match the
         # loaded file, but the user can override it via the checkbox.
         self.include_header_var = tk.BooleanVar(value=True)
@@ -237,10 +159,6 @@ class CsvWaveformEditorApp(tk.Tk):
         toolbar_frame.pack(fill=tk.X)
         ttk.Button(toolbar_frame, text="Load CSV...", command=self.load_csv).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(toolbar_frame, text="Save As CSV...", command=self.save_csv).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(toolbar_frame, text="Interpolate...", command=self.open_interpolate_dialog).pack(
-            side=tk.LEFT, padx=(0, 8)
-        )
-        ttk.Button(toolbar_frame, text="Undo (Ctrl+Z)", command=self.undo).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(toolbar_frame, text="Reset View", command=self.reset_view).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Checkbutton(
             toolbar_frame, text="保存时包含表头 (Header)", variable=self.include_header_var
@@ -251,19 +169,11 @@ class CsvWaveformEditorApp(tk.Tk):
         fig_frame = ttk.Frame(self)
         fig_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.figure = Figure(figsize=(9, 7), dpi=100)
-        gridspec = self.figure.add_gridspec(2, 1, height_ratios=[5, 1], hspace=0.35)
-        self.ax = self.figure.add_subplot(gridspec[0])
+        self.figure = Figure(figsize=(9, 6), dpi=100)
+        self.ax = self.figure.add_subplot(111)
         self.ax.set_xlabel("Sample Index")
         self.ax.set_ylabel("Voltage (V, absolute)")
         self.ax.grid(True, linestyle=":", alpha=0.6)
-
-        self.ax_overview = self.figure.add_subplot(gridspec[1])
-        self.ax_overview.set_xlabel("Overview (full range)")
-        self.ax_overview.set_yticks([])
-        self.ax_overview.grid(True, linestyle=":", alpha=0.4)
-        # Overview always shows the full curve; don't let the toolbar pan/zoom it.
-        self.ax_overview.set_navigate(False)
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=fig_frame)
         self.canvas.draw()
@@ -280,7 +190,7 @@ class CsvWaveformEditorApp(tk.Tk):
             value=(
                 "拖动曲线上的点可修改电压值（X 保持不变）。按住 Ctrl 点选或拖出选框可多选，"
                 "再拖动其中一点可整体改变所选点的高度。按住右键拖动可平移视图，单击右键可取消当前的 Pan/Zoom 工具。"
-                "工具栏/滚轮用于手动缩放。下方为整体预览，橙色框表示当前查看/编辑的范围。Ctrl+Z 可撤销。"
+                "工具栏/滚轮用于手动缩放。"
             )
         )
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
@@ -295,8 +205,6 @@ class CsvWaveformEditorApp(tk.Tk):
         self.canvas.mpl_connect("scroll_event", self._on_scroll)
         self.canvas.mpl_connect("key_press_event", self._on_key_press)
         self.canvas.mpl_connect("key_release_event", self._on_key_release)
-
-        self.bind_all("<Control-z>", self.undo)
 
     def load_csv(self):
         path = filedialog.askopenfilename(
@@ -316,9 +224,6 @@ class CsvWaveformEditorApp(tk.Tk):
         self.x_header = x_header
         self.curves = curves
         self.selected_points = []
-        self.undo_stack = []
-        self._pending_pre_snapshot = None
-        self._pending_changed_range = None
         self.include_header_var.set(had_header)
         self.file_label_var.set(Path(path).name)
         self.status_var.set(f"已加载 {Path(path).name}：{len(x_values)} 个采样点，{len(curves)} 条曲线。")
@@ -330,19 +235,10 @@ class CsvWaveformEditorApp(tk.Tk):
         self.ax.set_ylabel("Voltage (V, absolute)")
         self.ax.grid(True, linestyle=":", alpha=0.6)
 
-        self.ax_overview.clear()
-        self.ax_overview.set_xlabel("Overview (full range)")
-        self.ax_overview.set_yticks([])
-        self.ax_overview.grid(True, linestyle=":", alpha=0.4)
-        self.ax_overview.set_navigate(False)
-
         self.lines = {}
-        self.overview_lines = {}
         for name, values in self.curves.items():
             (line,) = self.ax.plot(self.x_values, values, marker="o", markersize=4, linewidth=1.2, label=name)
             self.lines[name] = line
-            (ov_line,) = self.ax_overview.plot(self.x_values, values, linewidth=0.8)
-            self.overview_lines[name] = ov_line
         if len(self.curves) > 1:
             self.ax.legend(loc="upper right")
 
@@ -353,11 +249,6 @@ class CsvWaveformEditorApp(tk.Tk):
 
         self._apply_initial_limits()
         self.ax.set_autoscale_on(False)
-        self._apply_overview_limits()
-        self.ax_overview.set_autoscale_on(False)
-        self._create_overview_indicator()
-        self._connect_overview_callback()
-        self._update_overview_indicator()
         self.canvas.draw_idle()
 
     def _apply_initial_limits(self):
@@ -370,51 +261,6 @@ class CsvWaveformEditorApp(tk.Tk):
         y_pad = (y_max - y_min) * 0.1 or 0.5
         self.ax.set_xlim(x_min - x_pad, x_max + x_pad)
         self.ax.set_ylim(max(0.0, y_min - y_pad), y_max + y_pad)
-
-    def _apply_overview_limits(self):
-        """The overview panel always shows the full data range, regardless of zoom."""
-        all_y = [v for values in self.curves.values() for v in values]
-        if not all_y or not self.x_values:
-            return
-        x_min, x_max = min(self.x_values), max(self.x_values)
-        y_min, y_max = min(all_y), max(all_y)
-        x_pad = (x_max - x_min) * 0.02 or 1
-        y_pad = (y_max - y_min) * 0.1 or 0.5
-        self.ax_overview.set_xlim(x_min - x_pad, x_max + x_pad)
-        self.ax_overview.set_ylim(max(0.0, y_min - y_pad), y_max + y_pad)
-
-    def _create_overview_indicator(self):
-        y_lo, y_hi = self.ax_overview.get_ylim()
-        x_lo, x_hi = self.ax.get_xlim()
-        self._overview_indicator = Rectangle(
-            (x_lo, y_lo),
-            x_hi - x_lo,
-            y_hi - y_lo,
-            edgecolor="orange",
-            facecolor="orange",
-            alpha=0.25,
-            linewidth=1.2,
-            zorder=6,
-        )
-        self.ax_overview.add_patch(self._overview_indicator)
-
-    def _connect_overview_callback(self):
-        if self._xlim_cid is not None:
-            try:
-                self.ax.callbacks.disconnect(self._xlim_cid)
-            except Exception:
-                pass
-        self._xlim_cid = self.ax.callbacks.connect("xlim_changed", lambda _ax: self._update_overview_indicator())
-
-    def _update_overview_indicator(self):
-        if self._overview_indicator is None:
-            return
-        x_lo, x_hi = self.ax.get_xlim()
-        y_lo, y_hi = self.ax_overview.get_ylim()
-        self._overview_indicator.set_xy((x_lo, y_lo))
-        self._overview_indicator.set_width(x_hi - x_lo)
-        self._overview_indicator.set_height(y_hi - y_lo)
-        self.canvas.draw_idle()
 
     def reset_view(self):
         if not self.curves:
@@ -552,9 +398,6 @@ class CsvWaveformEditorApp(tk.Tk):
                 self._drag_mode = "group"
                 self._drag_anchor_y = event.ydata
                 self._drag_start_values = {(c, i): self.curves[c][i] for c, i in self.selected_points}
-                xs = [self.x_values[i] for _c, i in self.selected_points]
-                self._pending_pre_snapshot = self._make_snapshot()
-                self._pending_changed_range = (min(xs), max(xs))
                 self.status_var.set(f"正在整体拖动 {len(self.selected_points)} 个已选中的点...")
             else:
                 # Plain click on a point: make it the sole selection and drag it alone.
@@ -562,9 +405,6 @@ class CsvWaveformEditorApp(tk.Tk):
                 self._refresh_selection_highlight()
                 self._drag_mode = "single"
                 self._drag_curve, self._drag_index = hit
-                self._pending_pre_snapshot = self._make_snapshot()
-                x_at = self.x_values[self._drag_index]
-                self._pending_changed_range = (x_at, x_at)
                 self.status_var.set(f"正在编辑: {self._drag_curve}[{self._drag_index}]")
             return
 
@@ -599,7 +439,6 @@ class CsvWaveformEditorApp(tk.Tk):
             values = self.curves[self._drag_curve]
             values[self._drag_index] = new_y
             self.lines[self._drag_curve].set_ydata(values)
-            self.overview_lines[self._drag_curve].set_ydata(values)
             self._refresh_selection_highlight(redraw=False)
             self.canvas.draw_idle()
         elif self._drag_mode == "group":
@@ -612,7 +451,6 @@ class CsvWaveformEditorApp(tk.Tk):
                 touched_curves.add(name)
             for name in touched_curves:
                 self.lines[name].set_ydata(self.curves[name])
-                self.overview_lines[name].set_ydata(self.curves[name])
             self._refresh_selection_highlight(redraw=False)
             self.canvas.draw_idle()
         elif self._drag_mode == "box":
@@ -636,10 +474,8 @@ class CsvWaveformEditorApp(tk.Tk):
             return
         if self._drag_mode == "single":
             value = self.curves[self._drag_curve][self._drag_index]
-            self._finalize_pending_undo(f"拖动 {self._drag_curve}[{self._drag_index}]")
             self.status_var.set(f"已更新 {self._drag_curve}[{self._drag_index}] = {value:.6f} V")
         elif self._drag_mode == "group":
-            self._finalize_pending_undo(f"整体拖动 {len(self.selected_points)} 个点")
             self.status_var.set(f"已整体更新 {len(self.selected_points)} 个点的高度。")
         elif self._drag_mode == "box":
             if self._select_box_start_data is not None and event.xdata is not None and event.ydata is not None:
@@ -665,142 +501,6 @@ class CsvWaveformEditorApp(tk.Tk):
         self._drag_index = None
         self._drag_start_values = {}
         self._drag_anchor_y = None
-
-    # -- Undo history -----------------------------------------------------
-
-    def _make_snapshot(self):
-        return {
-            "x_values": list(self.x_values),
-            "curves": {name: list(values) for name, values in self.curves.items()},
-        }
-
-    def _restore_snapshot(self, snapshot):
-        self.x_values = list(snapshot["x_values"])
-        self.curves = {name: list(values) for name, values in snapshot["curves"].items()}
-        self.selected_points = []
-
-    def _push_undo(self, pre_snapshot, changed_x_range, description):
-        self.undo_stack.append(
-            {"snapshot": pre_snapshot, "changed_x_range": changed_x_range, "description": description}
-        )
-        if len(self.undo_stack) > self._undo_stack_limit:
-            self.undo_stack.pop(0)
-
-    def _finalize_pending_undo(self, description):
-        """Push the drag that just finished onto the undo stack, if it actually changed data."""
-        if self._pending_pre_snapshot is None:
-            return
-        if self._pending_pre_snapshot["curves"] != self.curves:
-            self._push_undo(self._pending_pre_snapshot, self._pending_changed_range, description)
-        self._pending_pre_snapshot = None
-        self._pending_changed_range = None
-
-    def undo(self, _event=None):
-        if not self.undo_stack:
-            self.status_var.set("没有可撤销的操作。")
-            return
-        entry = self.undo_stack.pop()
-        self._restore_snapshot(entry["snapshot"])
-        self._plot_curves()
-        self._zoom_to_range(entry["changed_x_range"])
-        self.status_var.set(f"已撤销: {entry['description']}")
-
-    def _zoom_to_range(self, x_range, x_pad_frac=0.15, y_pad_frac=0.2):
-        if x_range is None or not self.x_values:
-            return
-        x_min, x_max = x_range
-        if x_min == x_max:
-            x_min -= 1.0
-            x_max += 1.0
-        span = x_max - x_min
-        pad = span * x_pad_frac or 1.0
-        x_lo, x_hi = x_min - pad, x_max + pad
-        self.ax.set_xlim(x_lo, x_hi)
-
-        ys_in_range = [
-            y for values in self.curves.values() for x, y in zip(self.x_values, values) if x_lo <= x <= x_hi
-        ]
-        if ys_in_range:
-            y_min, y_max = min(ys_in_range), max(ys_in_range)
-            y_pad = (y_max - y_min) * y_pad_frac or 0.5
-            self.ax.set_ylim(max(0.0, y_min - y_pad), y_max + y_pad)
-        self.canvas.draw_idle()
-
-    # -- Interpolation ------------------------------------------------------
-
-    def open_interpolate_dialog(self):
-        if not self.curves or not self.x_values:
-            messagebox.showwarning("无数据", "请先加载 CSV 文件。")
-            return
-
-        dialog = tk.Toplevel(self)
-        dialog.title("插值 / Interpolate")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
-
-        frame = ttk.Frame(dialog, padding=12)
-        frame.pack(fill=tk.BOTH, expand=True)
-
-        ttk.Label(frame, text="插值方式 (Method):").grid(row=0, column=0, padx=(0, 8), pady=6, sticky=tk.W)
-        method_var = tk.StringVar(value=INTERPOLATION_METHODS[0])
-        method_combo = ttk.Combobox(
-            frame, textvariable=method_var, values=INTERPOLATION_METHODS, state="readonly", width=16
-        )
-        method_combo.grid(row=0, column=1, pady=6, sticky=tk.W)
-
-        ttk.Label(frame, text="目标采样点数 (Points):").grid(row=1, column=0, padx=(0, 8), pady=6, sticky=tk.W)
-        count_var = tk.StringVar(value=str(len(self.x_values)))
-        ttk.Entry(frame, textvariable=count_var, width=18).grid(row=1, column=1, pady=6, sticky=tk.W)
-
-        ttk.Label(
-            frame,
-            text="将对全部曲线按所选方式重采样到指定点数（应用后可用 Undo 撤销）。",
-            wraplength=320,
-            justify=tk.LEFT,
-        ).grid(row=2, column=0, columnspan=2, pady=(4, 10), sticky=tk.W)
-
-        button_row = ttk.Frame(frame)
-        button_row.grid(row=3, column=0, columnspan=2, sticky=tk.E)
-
-        def on_apply():
-            try:
-                target_count = int(count_var.get())
-            except ValueError:
-                messagebox.showerror("参数错误", "目标采样点数必须是整数。", parent=dialog)
-                return
-            if target_count < 2:
-                messagebox.showerror("参数错误", "目标采样点数至少为 2。", parent=dialog)
-                return
-            try:
-                self._apply_interpolation(method_var.get(), target_count)
-            except Exception as exc:
-                messagebox.showerror("插值失败", str(exc), parent=dialog)
-                return
-            dialog.destroy()
-
-        ttk.Button(button_row, text="应用 Apply", command=on_apply).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(button_row, text="取消 Cancel", command=dialog.destroy).pack(side=tk.LEFT)
-
-    def _apply_interpolation(self, method, target_count):
-        old_x = np.asarray(self.x_values, dtype=float)
-        x_min, x_max = float(old_x[0]), float(old_x[-1])
-        new_x = np.linspace(x_min, x_max, int(target_count))
-
-        new_curves = {}
-        for name, values in self.curves.items():
-            new_y = interpolate_values(old_x, values, new_x, method)
-            new_y = np.clip(new_y, 0.0, None)
-            new_curves[name] = new_y.tolist()
-
-        pre_snapshot = self._make_snapshot()
-        self.x_values = new_x.tolist()
-        self.curves = new_curves
-        self.selected_points = []
-
-        self._push_undo(pre_snapshot, (x_min, x_max), f"插值 ({method}) -> {target_count} 点")
-        self._plot_curves()
-        self.status_var.set(f"已对全部曲线执行 {method} 插值，重采样为 {target_count} 个采样点。")
 
     def save_csv(self):
         if not self.curves:
