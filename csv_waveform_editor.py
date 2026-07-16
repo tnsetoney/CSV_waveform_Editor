@@ -243,7 +243,7 @@ class CsvWaveformEditorApp(tk.Tk):
         ttk.Button(toolbar_frame, text="Undo (Ctrl+Z)", command=self.undo).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(toolbar_frame, text="Reset View", command=self.reset_view).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Checkbutton(
-            toolbar_frame, text="保存时包含表头 (Header)", variable=self.include_header_var
+            toolbar_frame, text="Include header row when saving", variable=self.include_header_var
         ).pack(side=tk.LEFT, padx=(0, 8))
         self.file_label_var = tk.StringVar(value="No file loaded")
         ttk.Label(toolbar_frame, textvariable=self.file_label_var).pack(side=tk.LEFT, padx=(8, 0))
@@ -278,9 +278,12 @@ class CsvWaveformEditorApp(tk.Tk):
         status_frame.pack(fill=tk.X)
         self.status_var = tk.StringVar(
             value=(
-                "拖动曲线上的点可修改电压值（X 保持不变）。按住 Ctrl 点选或拖出选框可多选，"
-                "再拖动其中一点可整体改变所选点的高度。按住右键拖动可平移视图，单击右键可取消当前的 Pan/Zoom 工具。"
-                "工具栏/滚轮用于手动缩放。下方为整体预览，橙色框表示当前查看/编辑的范围。Ctrl+Z 可撤销。"
+                "Drag a point on the curve to change its value (X stays fixed). "
+                "Ctrl+click or drag a selection box to multi-select, then drag any selected point "
+                "to move the whole selection's height together. Hold the right mouse button and drag "
+                "to pan the view; a plain right click cancels the active Pan/Zoom tool. "
+                "Use the toolbar or scroll wheel to zoom manually. The panel below is an overview of "
+                "the full curve; the orange box shows the currently visible/edited range. Ctrl+Z undoes."
             )
         )
         ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
@@ -321,7 +324,7 @@ class CsvWaveformEditorApp(tk.Tk):
         self._pending_changed_range = None
         self.include_header_var.set(had_header)
         self.file_label_var.set(Path(path).name)
-        self.status_var.set(f"已加载 {Path(path).name}：{len(x_values)} 个采样点，{len(curves)} 条曲线。")
+        self.status_var.set(f"Loaded {Path(path).name}: {len(x_values)} samples, {len(curves)} curve(s).")
         self._plot_curves()
 
     def _plot_curves(self):
@@ -500,7 +503,7 @@ class CsvWaveformEditorApp(tk.Tk):
         # A right click always cancels whatever toolbar tool (pan/zoom) is active.
         if self.toolbar.mode:
             self._cancel_active_tool()
-            self.status_var.set("已取消当前工具（Pan/Zoom）。")
+            self.status_var.set("Cancelled the active Pan/Zoom tool.")
         if event.x is None or event.y is None:
             return
         # Also arm right-button pan, in case the user drags instead of just clicking.
@@ -544,7 +547,7 @@ class CsvWaveformEditorApp(tk.Tk):
                     self.selected_points.append(hit)
                 self._drag_mode = None
                 self._refresh_selection_highlight()
-                self.status_var.set(f"已选中 {len(self.selected_points)} 个点。")
+                self.status_var.set(f"Selected {len(self.selected_points)} point(s).")
                 return
 
             if hit in self.selected_points and len(self.selected_points) > 1:
@@ -555,7 +558,7 @@ class CsvWaveformEditorApp(tk.Tk):
                 xs = [self.x_values[i] for _c, i in self.selected_points]
                 self._pending_pre_snapshot = self._make_snapshot()
                 self._pending_changed_range = (min(xs), max(xs))
-                self.status_var.set(f"正在整体拖动 {len(self.selected_points)} 个已选中的点...")
+                self.status_var.set(f"Dragging {len(self.selected_points)} selected point(s) together...")
             else:
                 # Plain click on a point: make it the sole selection and drag it alone.
                 self.selected_points = [hit]
@@ -565,7 +568,7 @@ class CsvWaveformEditorApp(tk.Tk):
                 self._pending_pre_snapshot = self._make_snapshot()
                 x_at = self.x_values[self._drag_index]
                 self._pending_changed_range = (x_at, x_at)
-                self.status_var.set(f"正在编辑: {self._drag_curve}[{self._drag_index}]")
+                self.status_var.set(f"Editing: {self._drag_curve}[{self._drag_index}]")
             return
 
         # Clicked empty space: start (or continue, if Ctrl held) a box selection.
@@ -636,11 +639,11 @@ class CsvWaveformEditorApp(tk.Tk):
             return
         if self._drag_mode == "single":
             value = self.curves[self._drag_curve][self._drag_index]
-            self._finalize_pending_undo(f"拖动 {self._drag_curve}[{self._drag_index}]")
-            self.status_var.set(f"已更新 {self._drag_curve}[{self._drag_index}] = {value:.6f} V")
+            self._finalize_pending_undo(f"Drag {self._drag_curve}[{self._drag_index}]")
+            self.status_var.set(f"Updated {self._drag_curve}[{self._drag_index}] = {value:.6f} V")
         elif self._drag_mode == "group":
-            self._finalize_pending_undo(f"整体拖动 {len(self.selected_points)} 个点")
-            self.status_var.set(f"已整体更新 {len(self.selected_points)} 个点的高度。")
+            self._finalize_pending_undo(f"Group drag of {len(self.selected_points)} point(s)")
+            self.status_var.set(f"Updated the height of {len(self.selected_points)} selected point(s).")
         elif self._drag_mode == "box":
             if self._select_box_start_data is not None and event.xdata is not None and event.ydata is not None:
                 x0, y0 = self._select_box_start_data
@@ -653,7 +656,7 @@ class CsvWaveformEditorApp(tk.Tk):
                     self.selected_points = found
                 self._refresh_selection_highlight()
                 if self.selected_points:
-                    self.status_var.set(f"已选中 {len(self.selected_points)} 个点。")
+                    self.status_var.set(f"Selected {len(self.selected_points)} point(s).")
             if self._select_box_patch is not None:
                 self._select_box_patch.remove()
                 self._select_box_patch = None
@@ -697,13 +700,13 @@ class CsvWaveformEditorApp(tk.Tk):
 
     def undo(self, _event=None):
         if not self.undo_stack:
-            self.status_var.set("没有可撤销的操作。")
+            self.status_var.set("Nothing to undo.")
             return
         entry = self.undo_stack.pop()
         self._restore_snapshot(entry["snapshot"])
         self._plot_curves()
         self._zoom_to_range(entry["changed_x_range"])
-        self.status_var.set(f"已撤销: {entry['description']}")
+        self.status_var.set(f"Undid: {entry['description']}")
 
     def _zoom_to_range(self, x_range, x_pad_frac=0.15, y_pad_frac=0.2):
         if x_range is None or not self.x_values:
@@ -730,11 +733,11 @@ class CsvWaveformEditorApp(tk.Tk):
 
     def open_interpolate_dialog(self):
         if not self.curves or not self.x_values:
-            messagebox.showwarning("无数据", "请先加载 CSV 文件。")
+            messagebox.showwarning("No data", "Load a CSV file first.")
             return
 
         dialog = tk.Toplevel(self)
-        dialog.title("插值 / Interpolate")
+        dialog.title("Interpolate")
         dialog.resizable(False, False)
         dialog.transient(self)
         dialog.grab_set()
@@ -742,20 +745,21 @@ class CsvWaveformEditorApp(tk.Tk):
         frame = ttk.Frame(dialog, padding=12)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="插值方式 (Method):").grid(row=0, column=0, padx=(0, 8), pady=6, sticky=tk.W)
+        ttk.Label(frame, text="Method:").grid(row=0, column=0, padx=(0, 8), pady=6, sticky=tk.W)
         method_var = tk.StringVar(value=INTERPOLATION_METHODS[0])
         method_combo = ttk.Combobox(
             frame, textvariable=method_var, values=INTERPOLATION_METHODS, state="readonly", width=16
         )
         method_combo.grid(row=0, column=1, pady=6, sticky=tk.W)
 
-        ttk.Label(frame, text="目标采样点数 (Points):").grid(row=1, column=0, padx=(0, 8), pady=6, sticky=tk.W)
+        ttk.Label(frame, text="Target point count:").grid(row=1, column=0, padx=(0, 8), pady=6, sticky=tk.W)
         count_var = tk.StringVar(value=str(len(self.x_values)))
         ttk.Entry(frame, textvariable=count_var, width=18).grid(row=1, column=1, pady=6, sticky=tk.W)
 
         ttk.Label(
             frame,
-            text="将对全部曲线按所选方式重采样到指定点数（应用后可用 Undo 撤销）。",
+            text="Resamples every curve to the chosen point count using the selected method "
+            "(applying this can be reverted with Undo).",
             wraplength=320,
             justify=tk.LEFT,
         ).grid(row=2, column=0, columnspan=2, pady=(4, 10), sticky=tk.W)
@@ -767,20 +771,20 @@ class CsvWaveformEditorApp(tk.Tk):
             try:
                 target_count = int(count_var.get())
             except ValueError:
-                messagebox.showerror("参数错误", "目标采样点数必须是整数。", parent=dialog)
+                messagebox.showerror("Invalid input", "Target point count must be an integer.", parent=dialog)
                 return
             if target_count < 2:
-                messagebox.showerror("参数错误", "目标采样点数至少为 2。", parent=dialog)
+                messagebox.showerror("Invalid input", "Target point count must be at least 2.", parent=dialog)
                 return
             try:
                 self._apply_interpolation(method_var.get(), target_count)
             except Exception as exc:
-                messagebox.showerror("插值失败", str(exc), parent=dialog)
+                messagebox.showerror("Interpolation failed", str(exc), parent=dialog)
                 return
             dialog.destroy()
 
-        ttk.Button(button_row, text="应用 Apply", command=on_apply).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(button_row, text="取消 Cancel", command=dialog.destroy).pack(side=tk.LEFT)
+        ttk.Button(button_row, text="Apply", command=on_apply).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(button_row, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT)
 
     def _apply_interpolation(self, method, target_count):
         old_x = np.asarray(self.x_values, dtype=float)
@@ -798,18 +802,18 @@ class CsvWaveformEditorApp(tk.Tk):
         self.curves = new_curves
         self.selected_points = []
 
-        self._push_undo(pre_snapshot, (x_min, x_max), f"插值 ({method}) -> {target_count} 点")
+        self._push_undo(pre_snapshot, (x_min, x_max), f"Interpolate ({method}) -> {target_count} points")
         self._plot_curves()
-        self.status_var.set(f"已对全部曲线执行 {method} 插值，重采样为 {target_count} 个采样点。")
+        self.status_var.set(f"Applied {method} interpolation to all curves, resampled to {target_count} points.")
 
     def save_csv(self):
         if not self.curves:
-            messagebox.showwarning("无数据", "请先加载 CSV 文件。")
+            messagebox.showwarning("No data", "Load a CSV file first.")
             return
 
         initial_name = f"{Path(self.csv_path).stem}_edited.csv" if self.csv_path else "edited.csv"
         path = filedialog.asksaveasfilename(
-            title="保存修改后的 CSV",
+            title="Save edited CSV",
             defaultextension=".csv",
             filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
             initialfile=initial_name,
@@ -826,11 +830,11 @@ class CsvWaveformEditorApp(tk.Tk):
                 include_header=self.include_header_var.get(),
             )
         except Exception as exc:
-            messagebox.showerror("保存失败", str(exc))
+            messagebox.showerror("Save failed", str(exc))
             return
 
-        self.status_var.set(f"已保存到 {path}")
-        messagebox.showinfo("保存成功", f"已保存修改后的 CSV：\n{path}")
+        self.status_var.set(f"Saved to {path}")
+        messagebox.showinfo("Saved", f"Saved the edited CSV to:\n{path}")
 
 
 def main():
