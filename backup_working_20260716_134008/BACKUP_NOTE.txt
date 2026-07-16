@@ -1,0 +1,5 @@
+Backup reason: known-working version of csv_waveform_editor.py before adding
+Ctrl-click / box-select multi-point selection and group drag-to-modify-height.
+Created: 2026-07-16 13:40:08
+Files:
+- csv_waveform_editor.py

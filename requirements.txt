@@ -1,0 +1,4 @@
+pyvisa>=1.16.0
+pyvisa-py>=0.8.0
+matplotlib>=3.7.0
+numpy>=1.24.0

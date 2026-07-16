@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^c:/Users/TTang/Documents/AI-Project/SignalGenerateCAN/\\.venv/Scripts/python\\.exe -m py_compile csv_waveform_editor\\.py; echo \"OK\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

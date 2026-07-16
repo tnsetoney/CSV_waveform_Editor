@@ -1,0 +1,47 @@
+{
+  "sample_rate": 4000000,
+  "scenarios": {
+    "base": {
+      "display_name": "CAN Base Traffic",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\base.csv",
+      "samples": 1958,
+      "sample_rate": 4000000
+    },
+    "timing_glitch": {
+      "display_name": "Timing Glitches",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\timing_glitch.csv",
+      "samples": 15652,
+      "sample_rate": 4000000
+    },
+    "slow_edges": {
+      "display_name": "Slow Edges",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\slow_edges.csv",
+      "samples": 1958,
+      "sample_rate": 4000000
+    },
+    "ringing": {
+      "display_name": "Ringing",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\ringing.csv",
+      "samples": 1958,
+      "sample_rate": 4000000
+    },
+    "dropped_bits": {
+      "display_name": "Dropped Bits",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\dropped_bits.csv",
+      "samples": 1958,
+      "sample_rate": 4000000
+    },
+    "voltage_spikes": {
+      "display_name": "Voltage Spikes",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\voltage_spikes.csv",
+      "samples": 1958,
+      "sample_rate": 4000000
+    },
+    "noise_overlay": {
+      "display_name": "Noise Overlay",
+      "file": "C:\\Users\\KWilliams\\OneDrive - Teletrac Navman\\Documents - System Engineering\\TeamWorkSpace\\KeithWorkSpace\\CANclick\\testing\\waveforms\\noise_overlay.csv",
+      "samples": 1958,
+      "sample_rate": 4000000
+    }
+  }
+}

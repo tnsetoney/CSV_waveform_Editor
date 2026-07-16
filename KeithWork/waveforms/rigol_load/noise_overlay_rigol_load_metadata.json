@@ -1,0 +1,44 @@
+{
+  "scenario": "noise_overlay",
+  "source_waveform": "noise_overlay.csv",
+  "sample_rate_hz": 4000000,
+  "recommended_generator_setup": {
+    "channel_1_file": "noise_overlay_CH1_CAN_H_normalized.csv",
+    "channel_2_file": "noise_overlay_CH2_CAN_L_normalized.csv",
+    "amplitude_v": 1.0,
+    "offset_v": 2.5,
+    "loop": true
+  },
+  "channels": [
+    {
+      "channel": "CH1_CAN_H",
+      "file": "noise_overlay_CH1_CAN_H_normalized.csv",
+      "samples": 1958,
+      "voltage_min": 2.400008,
+      "voltage_max": 3.599623,
+      "recommended_import": {
+        "sample_rate_hz": 4000000,
+        "waveform_amplitude_v": 1.0,
+        "waveform_offset_v": 2.5,
+        "data_format": "normalized_single_column_csv"
+      },
+      "normalized_min": -0.09999199999999986,
+      "normalized_max": 1.0
+    },
+    {
+      "channel": "CH2_CAN_L",
+      "file": "noise_overlay_CH2_CAN_L_normalized.csv",
+      "samples": 1958,
+      "voltage_min": 1.400109,
+      "voltage_max": 2.599956,
+      "recommended_import": {
+        "sample_rate_hz": 4000000,
+        "waveform_amplitude_v": 1.0,
+        "waveform_offset_v": 2.5,
+        "data_format": "normalized_single_column_csv"
+      },
+      "normalized_min": -1.0,
+      "normalized_max": 0.09995600000000016
+    }
+  ]
+}

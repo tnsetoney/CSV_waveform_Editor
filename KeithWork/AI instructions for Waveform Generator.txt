@@ -1,0 +1,16 @@
+I'd like to use my Rigol DG 822 Pro to simulate corrupted or electrically poor CAN-H and CAN-L signals on its 2 output channels.
+
+Please generate configuration files for the following scenarios (all at 500kb baud rate):
+
+1. Generate CAN traffic using data from "Volvo ECU plaintext 1_6-normalised-CH1 1.csv" from this directory to create CAN-H and CAN-L
+2. Use item #1 above as a template but add the following test conditions:
+	a. Insert timing glitches.
+	b. add slow edges.
+	c. add ringing to the waveforms.
+	d. add dropped bits to the waveform.
+	e. add Voltage spikes to the waveforms.
+	f. add noise overlay to the waveform.
+Each test will run in a continuous loop, use ctrl-c to exit.
+
+I would be nice to have a menu driven test setup from my PC enabling each of the above scenarios using USB to the waveform generator.
+It can use Rigol Ultra Sigma if that seems appropriate.

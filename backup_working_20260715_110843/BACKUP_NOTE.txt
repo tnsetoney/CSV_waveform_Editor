@@ -1,0 +1,7 @@
+Backup reason: known-working version for channel control with UltraStation waveform download
+Created: 2026-07-15 11:08:43
+Files:
+- dg822_csv_gui.py
+- rigol_can_waveform_generator.py
+- dg822.py
+- requirements.txt
