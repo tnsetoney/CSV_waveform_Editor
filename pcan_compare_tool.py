@@ -58,15 +58,22 @@ class CanChannelReader(threading.Thread):
         self.on_error = on_error
         self.on_opened = on_opened
         self._stop_event = threading.Event()
+        self._opened_event = threading.Event()
         self.bus = None
+
+    def wait_until_opened(self, timeout=5.0):
+        """Block until this channel has finished trying to open (success or failure)."""
+        return self._opened_event.wait(timeout=timeout)
 
     def run(self):
         try:
             self.bus = can.Bus(interface="pcan", channel=self.channel, bitrate=self.bitrate)
         except Exception as exc:
             self.on_error(self.label, f"Failed to open {self.channel}: {exc}")
+            self._opened_event.set()
             return
 
+        self._opened_event.set()
         if self.on_opened:
             self.on_opened(self.label)
 
@@ -390,8 +397,12 @@ class PcanCompareApp(tk.Tk):
         self.reader_b = CanChannelReader(
             self.LABEL_B, channel_b, bitrate_b, self._on_message, self._on_reader_error
         )
+        # Two channels on the same multi-channel PCAN device can race if
+        # opened concurrently; wait for A to finish opening before starting B.
         self.reader_a.start()
+        self.reader_a.wait_until_opened(timeout=5.0)
         self.reader_b.start()
+        self.reader_b.wait_until_opened(timeout=5.0)
 
         for widget in (
             self.channel_a_combo,
