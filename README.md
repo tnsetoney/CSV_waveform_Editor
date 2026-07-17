@@ -82,6 +82,15 @@ Unmatched in a live table plus running per-channel statistics and an
 overall match rate. Useful for validating that two taps on the same bus
 (or a gateway/repeater between two segments) see identical traffic.
 
+Optionally, a third **Channel C** can transmit a reference CAN trace CSV
+(same format as `KeithWork/Volvo ECU plaintext 1_6-normalised-CH1 1.csv`:
+`Time Stamp,ID,Extended,Dir,Bus,LEN,D1..D8`) onto the bus, with adjustable
+playback speed and looping. Every frame Channel C sends is also checked
+against what A and B subsequently receive, so the tool reports not only
+whether A and B agree with each other, but whether each of them matches
+the known-good reference data (Sent OK / Sent Mismatch / Sent Missing).
+Channel C must be a different PCAN channel than A and B.
+
 ## Notes
 
 - All instrument communication goes through PyVISA; if no VISA backend is

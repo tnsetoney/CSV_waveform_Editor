@@ -1,0 +1,7 @@
+Backup reason: known-working version of pcan_compare_tool.py before adding a
+third "Channel C" send/reference feature (load a Volvo-format CAN trace CSV
+and transmit it, comparing what channel A and B receive against both each
+other and the sent reference data).
+Created: 2026-07-17 14:36:40
+Files:
+- pcan_compare_tool.py
