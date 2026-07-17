@@ -12,6 +12,7 @@ the source data.
 | [dg822_csv_gui.py](dg822_csv_gui.py) | Main Tkinter GUI: connect to a DG822 over VISA, load CSV waveform(s), upload/download to the instrument, and control channel outputs. |
 | [rigol_can_waveform_generator.py](rigol_can_waveform_generator.py) | Core `RigolWaveformManager` class used by the GUI and CLI: VISA connection handling, CSV parsing, waveform prep (voltage/DAC), multiple SCPI transfer strategies (`TRACE BIN`/`CODE`/`VOLTAGE`/`MMEM`) with fallbacks, output enable/disable, and an interactive CLI menu (`python rigol_can_waveform_generator.py`). |
 | [csv_waveform_editor.py](csv_waveform_editor.py) | Standalone Tk + matplotlib tool to load a CSV, plot the (absolute) voltage values, drag individual or multi-selected points to edit the curve, pan/zoom manually, and export the edited data to a new CSV. |
+| [pcan_compare_tool.py](pcan_compare_tool.py) | Tk GUI that opens two PEAK PCAN channels (via python-can) and compares their live CAN frames against each other in real time, reporting matches/mismatches/unmatched frames and running statistics. |
 | [dg822.py](dg822.py) | Lower-level `dg822` class for direct PyVISA interaction with the DG8xx/DG9xx AWG series. |
 | [debug_csv_download_only.py](debug_csv_download_only.py) | CLI debug script that downloads a dual-column CSV to DG822 memory without enabling outputs, for protocol troubleshooting. |
 | [requirements.txt](requirements.txt) | Python dependencies: `pyvisa`, `pyvisa-py`, `matplotlib`, `numpy`. |
@@ -66,6 +67,20 @@ python rigol_can_waveform_generator.py
 
 Detect/connect to the instrument, transfer one of the bundled scenario
 waveforms, stop output, or inspect waveform stats, via a numbered menu.
+
+### Compare two PEAK PCAN channels in real time
+
+```powershell
+python pcan_compare_tool.py
+```
+
+Requires the PEAK PCAN-Basic driver and python-can. Pick a channel and
+bitrate for A and B (auto-detected via `can.detect_available_configs` when
+available), click **Start**, and the tool matches frames arriving on both
+channels by CAN ID (in arrival order) and reports Match / Mismatch /
+Unmatched in a live table plus running per-channel statistics and an
+overall match rate. Useful for validating that two taps on the same bus
+(or a gateway/repeater between two segments) see identical traffic.
 
 ## Notes
 

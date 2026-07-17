@@ -3,3 +3,4 @@ pyvisa-py>=0.8.0
 matplotlib>=3.7.0
 numpy>=1.24.0
 scipy>=1.10.0
+python-can>=4.6.0
